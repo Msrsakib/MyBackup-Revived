@@ -1,0 +1,6 @@
+config = {
+  "redirect_uri": "https://msrsakib.github.io/MyBackup-Revived/login.html",
+  "client_id": "3010d0e4341c46c8b521e052f95c348f",
+  "slowdown_import": 100,
+  "slowdown_export": 100
+};
