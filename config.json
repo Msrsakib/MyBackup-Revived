@@ -1,0 +1,7 @@
+{
+  "clientId": "3010d0e4341c46c8b521e052f95c348f",
+  "redirectUri": "https://msrsakib.github.io/MyBackup-Revived/login.html",
+  "scope": "playlist-read-private playlist-read-collaborative user-library-read",
+  "authEndpoint": "https://accounts.spotify.com/authorize",
+  "showDialog": true
+}
