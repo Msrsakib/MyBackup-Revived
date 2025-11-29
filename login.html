@@ -1,134 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>Spotify Login Handler</title>
-  <!-- load your config (must be present in repo as config.js) -->
-  <script type="text/javascript" src="config.js"></script>
+  <meta charset="UTF-8">
+  <title>Spotify Login</title>
   <style>
-    /* Minimal styling for the redirect page */
-    html,body{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif;background:#0f1720;color:#e6eef8;display:flex;align-items:center;justify-content:center}
-    .box{max-width:560px;padding:24px;border-radius:8px;background:rgba(255,255,255,0.03);text-align:center;box-shadow:0 4px 18px rgba(2,6,23,0.6)}
-    .title{font-size:18px;margin-bottom:8px}
-    .sub{font-size:13px;color:#bcd0e6;margin-bottom:14px}
-    .ok{display:inline-block;margin-top:12px;padding:8px 12px;border-radius:6px;background:#1db954;color:#fff;text-decoration:none}
-    .error{color:#ffb4b4}
-    .small{font-size:12px;color:#9fb2d1;margin-top:8px}
+    body {
+      background: #111;
+      color: #eee;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+    }
+    .message {
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <div class="box" id="root">
-    <div class="title">SpotMyBackup — Spotify Login</div>
-    <div class="sub" id="status">Processing authentication response…</div>
-    <div id="action"></div>
-    <div class="small">If nothing happens, close this page and try again from the Backup UI.</div>
+  <div class="message">
+    <h2>Logging into Spotify...</h2>
+    <p>Please wait...</p>
   </div>
 
   <script>
-    (function () {
-      // Ensure config is loaded
-      if (typeof config === 'undefined') {
-        document.getElementById('status').innerHTML = '<span class="error">Error: config.js not loaded.</span>';
-        return;
-      }
-
-      // Helper: parse location hash for access_token
-      function parseHash(hash) {
-        if (!hash) return {};
-        // remove leading # if present
-        if (hash.charAt(0) === '#') hash = hash.substring(1);
-        var parts = hash.split('&');
-        var out = {};
-        parts.forEach(function(p){
-          var kv = p.split('=');
-          out[decodeURIComponent(kv[0])] = kv[1] ? decodeURIComponent(kv[1]) : '';
-        });
-        return out;
-      }
-
-      // Helper: get origin from redirect_uri in config
-      function getOriginFromURI(uri) {
-        try {
-          var u = new URL(uri);
-          return u.origin;
-        } catch (e) {
-          return '*';
-        }
-      }
-
-      var conf = config || {};
-      var hashData = parseHash(window.location.hash);
-      var statusEl = document.getElementById('status');
-      var actionEl = document.getElementById('action');
-
-      // If there is an access_token in the hash, post it to the opener/parent
-      if (hashData && hashData.access_token) {
-        var token = hashData.access_token;
-        var token_type = hashData.token_type || '';
-        var expires_in = hashData.expires_in || '';
-
-        statusEl.textContent = 'Authentication succeeded — sending token back to app…';
-
-        // Determine target window (opener for popup, parent for iframe)
-        var targetWindow = window.opener || window.parent || null;
-
-        // Build message payload
-        var payload = {
-          access_token: token,
-          token_type: token_type,
-          expires_in: expires_in,
-          timestamp: Date.now()
-        };
-
-        // Determine allowed origin to postMessage (use config.redirect_uri origin if available)
-        var allowedOrigin = getOriginFromURI(conf.redirect_uri || window.location.href);
-
-        try {
-          if (targetWindow && targetWindow.postMessage) {
-            // Post the token object
-            targetWindow.postMessage({ type: 'spotmybackup_auth', data: payload }, allowedOrigin);
-            // Show user a success message + close hint
-            actionEl.innerHTML = '<a class="ok" href="#" id="closeBtn">Return to app</a>';
-            document.getElementById('closeBtn').addEventListener('click', function (e) {
-              e.preventDefault();
-              window.close();
-            });
-            // If opened as a popup, try to close after short delay
-            setTimeout(function () {
-              try { window.close(); } catch (e) {}
-            }, 1200);
+    fetch('config.json')
+      .then(response => response.json())
+      .then(conf => {
+        const hash = window.location.hash;
+        if (!hash) {
+          const authParams = new URLSearchParams({
+            client_id: conf.clientId,
+            response_type: 'token',
+            redirect_uri: conf.redirectUri,
+            scope: conf.scope,
+            show_dialog: conf.showDialog
+          });
+          window.location.href = `${conf.authEndpoint}?${authParams.toString()}`;
+        } else {
+          const params = new URLSearchParams(hash.substring(1));
+          const token = params.get('access_token');
+          if (token) {
+            window.opener.postMessage({ token }, conf.redirectUri);
+            window.close();
           } else {
-            // No parent/opener found — show token to user as fallback
-            statusEl.innerHTML = '<span class="error">No parent window detected to send the token.</span>';
-            actionEl.innerHTML = '<pre style="text-align:left;max-height:200px;overflow:auto;background:#001018;padding:8px;border-radius:6px;">' +
-              JSON.stringify(payload, null, 2) +
-              '</pre>';
+            document.body.innerHTML = "<h2>Authorization failed. No access token found.</h2>";
           }
-        } catch (ex) {
-          statusEl.innerHTML = '<span class="error">Error sending token to parent: ' + (ex.message || ex) + '</span>';
-          actionEl.innerHTML = '<pre style="text-align:left;max-height:200px;overflow:auto;background:#001018;padding:8px;border-radius:6px;">' +
-              JSON.stringify(payload, null, 2) +
-              '</pre>';
         }
-      } else {
-        // No token in hash — show helpful message
-        statusEl.innerHTML = '<span class="error">No access token found in the URL.</span>';
-        actionEl.innerHTML = '<div style="margin-top:12px"><a class="ok" href="#" id="retry">Retry Login</a></div>';
-        document.getElementById('retry').addEventListener('click', function (e) {
-          e.preventDefault();
-          // Try to open authorize endpoint again using config info (fallback)
-          var client = conf.client_id || '';
-          var redirect = conf.redirect_uri || window.location.href;
-          if (!client) {
-            statusEl.innerHTML = '<span class="error">Missing client_id in config.js</span>';
-            return;
-          }
-          var scope = encodeURIComponent('playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private user-library-read');
-          var authUrl = 'https://accounts.spotify.com/authorize?response_type=token&client_id=' + encodeURIComponent(client) + '&scope=' + scope + '&redirect_uri=' + encodeURIComponent(redirect);
-          window.location.href = authUrl;
-        });
-      }
-    })();
+      })
+      .catch(error => {
+        console.error("Failed to load config.json", error);
+        document.body.innerHTML = "<h2>Failed to load config. Please try again.</h2>";
+      });
   </script>
 </body>
 </html>
