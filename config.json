@@ -1,4 +1,5 @@
 {
-  "id": "3010d0e4341c46c8b521e052f95c348f",
-  "uri": "https://msrsakib.github.io/MyBackup-Revived"
+  "client_id": "3010d0e4341c46c8b521e052f95c348f",
+  "redirect_uri": "https://msrsakib.github.io/MyBackup-Revived/login.html",
+  "scopes": "user-library-read playlist-read-private playlist-read-collaborative"
 }
